@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Stl.Internal;
@@ -21,11 +22,29 @@ namespace Stl.Fusion.Blazor
 
         protected StatefulComponentBase()
         {
-            StateChanged = (state, eventKind) => InvokeAsync(() => {
-                if ((eventKind & StateHasChangedTriggers) != 0)
-                    StateHasChanged();
-            });
-        }
+			// The async modifier in the lambda passed to InvokeAsync below
+			//  is needed to prevent occasional ObjectDisposedExceptions:
+			// "Cannot process pending renders after the renderer has been disposed".
+			// Without the lambda being really async, StateHasChanged may synchronously execute an actual render immediately.
+			// Appears related to this issue https://github.com/dotnet/aspnetcore/issues/22159 
+			// To reproduce:
+			// - Uncomment the block and comment out the current block with the asynch lambda
+			// - navigate from https://localhost:5001/todo to https://localhost:5001/todo2 
+			//   where todo2 is a literal copy of the todopage.razor, with the route changed to /todo2
+			
+			//StateChanged = (state, eventKind) => InvokeAsync(() => {
+			//	if ((eventKind & StateHasChangedTriggers) != 0) {
+			//		StateHasChanged();
+			//	}
+			//});
+
+			StateChanged = (state, eventKind) => InvokeAsync(async () => {
+				if ((eventKind & StateHasChangedTriggers) != 0) {
+                    await Task.Yield();
+					StateHasChanged();
+				}
+			});
+		}
 
         public virtual void Dispose()
         {
