@@ -8,67 +8,75 @@
 @inject AuthStateProvider AuthStateProvider
 
 @{
+    RerenderOnEvents = false;
+
     var error = State.Error;
     var todos = State.UnsafeValue ?? Array.Empty<Todo>(); // UnsafeValue returns default if there is an Error
 }
 
 <h1>Todo List</h1>
 
-<StatefulComponentState Component="@this"/>
+<ComponentStateLabel StateToWatch="@State" />
 <Text Margin="Margin.Is1.OnY">
-    Updated: <b><MomentsAgoBadge Value="LastStateUpdateTime"/></b>
+    Updated: <b><MomentsAgoBadge Value="LastStateUpdateTime" /></b>
 </Text>
 
 <AuthorizeView>
     <NotAuthorized>
-        <SignInDropdown Why="to use this page"/>
+        <SignInDropdown Why="to use this page" />
     </NotAuthorized>
-    <Authorized><!--
-This comment is here solely to reset the indent in VS / Rider -->
+    <Authorized>
+        <!--
+        This comment is here solely to reset the indent in VS / Rider -->
 
-<WhenException Exception="error"/>
-<WhenCommandError Exception="CommandRunner.Error"/>
+        <WhenException Exception="error" />
+        <WhenCommandError Exception="CommandRunner.Error" />
 
-<Row><Column ColumnSize="ColumnSize.Is6.OnDesktop.Is12.OnTablet">
-    @foreach(var todo in todos) {
-        <Addons Margin="Margin.Is3.OnY">
-            <Addon AddonType="AddonType.Start">
-                <AddonLabel>
-                    <Blazorise.Icon Name="@(todo.IsDone ? FontAwesomeIcons.CheckSquare : FontAwesomeIcons.Square)"
-                                    @onclick="_ => InvertDone(todo)" />
-                </AddonLabel>
-            </Addon>
-            <TextEdit TextChanged="text => UpdateTitle(todo, text)" ChangeTextOnKeyPress="false"
-                      Text="@todo.Title"/>
-            <Addon AddonType="AddonType.End">
-                <Button Clicked="_ => Remove(todo)" Color="Color.Warning">
-                    <Blazorise.Icon Name="FontAwesomeIcons.Minus"/>
-                </Button>
-            </Addon>
-        </Addons>
-    }
+        <Row>
+            <Column ColumnSize="ColumnSize.Is6.OnDesktop.Is12.OnTablet">
+                @foreach (var todo in todos)
+                {
+                    <Addons Margin="Margin.Is3.OnY">
+                        <Addon AddonType="AddonType.Start">
+                            <AddonLabel>
+                                <Blazorise.Icon Name="@(todo.IsDone ? FontAwesomeIcons.CheckSquare : FontAwesomeIcons.Square)"
+                                                @onclick="_ => InvertDone(todo)" />
+                            </AddonLabel>
+                        </Addon>
+                        <TextEdit TextChanged="text => UpdateTitle(todo, text)" ChangeTextOnKeyPress="false"
+                                  Text="@todo.Title" />
+                        <Addon AddonType="AddonType.End">
+                            <Button Clicked="_ => Remove(todo)" Color="Color.Warning">
+                                <Blazorise.Icon Name="FontAwesomeIcons.Minus" />
+                            </Button>
+                        </Addon>
+                    </Addons>
+                }
 
-    @if (HasMore) {
-        <Button Clicked="_ => LoadMore()" Color="Color.Primary" Margin="Margin.Is3.OnY">
-            Load more <Blazorise.Icon Name="FontAwesomeIcons.AngleDoubleDown"/>
-        </Button>
-    }
+                @if (HasMore)
+                {
+                    <Button Clicked="_ => LoadMore()" Color="Color.Primary" Margin="Margin.Is3.OnY">
+                        Load more <Blazorise.Icon Name="FontAwesomeIcons.AngleDoubleDown" />
+                    </Button>
+                }
 
-    <Form @onsubmit="_ => Create()" Margin="Margin.Is3.OnY" >
-        <Addons>
-            <Addon AddonType="AddonType.Start">
-                <Button Type="@ButtonType.Submit" Color="Color.Primary">
-                    <Blazorise.Icon Name="@FontAwesomeIcons.PlusSquare"/>
-                </Button>
-            </Addon>
-            <input @bind="NewTodoTitle" @bind:event="onchange" class="form-control"/>
-        </Addons>
-    </Form>
+                <Form @onsubmit="_ => Create()" Margin="Margin.Is3.OnY">
+                    <Addons>
+                        <Addon AddonType="AddonType.Start">
+                            <Button Type="@ButtonType.Submit" Color="Color.Primary">
+                                <Blazorise.Icon Name="@FontAwesomeIcons.PlusSquare" />
+                            </Button>
+                        </Addon>
+                        <input @bind="NewTodoTitle" @bind:event="onchange" class="form-control" />
+                    </Addons>
+                </Form>
 
-</Column></Row>
+            </Column>
+        </Row>
 
-<!--
- --></Authorized>
+        <!--
+         -->
+    </Authorized>
 </AuthorizeView>
 
 
@@ -85,7 +93,6 @@ This comment is here solely to reset the indent in VS / Rider -->
     protected override void OnInitialized()
     {
         CommandRunner.Component = this;
-        StateHasChangedTriggers = StateEventKind.All;
         base.OnInitialized();
     }
 

@@ -3,15 +3,26 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Stl.Internal;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Stl.Fusion.Blazor
 {
-    public abstract class StatefulComponentBase : ComponentBase, IDisposable
+    public abstract class StatefulComponentBase : ComponentBase, IDisposable, IHandleEvent
     {
         [Inject]
         protected IServiceProvider Services { get; set; } = null!;
         protected IStateFactory StateFactory => Services.StateFactory();
         protected bool OwnsState { get; set; } = true;
+
+        // This flag allows components to suppress the call to StateHasChanged()
+        // normally fired by Blazor on each event.
+        // The default rerender can cause screen flicker, when "controlled Components" such as text boxes
+        // get rerendered with their current (old) state, after the user has typed text, triggered a click event, 
+        // that initiated a state update that is only be reflected in the State after a delay
+        // https://github.com/dotnet/aspnetcore/issues/18919#issuecomment-735779810 
+        protected bool RerenderOnEvents { get; set; } = true;
         protected internal abstract IState UntypedState { get; }
         protected Action<IState, StateEventKind> StateChanged { get; set; }
         protected StateEventKind StateHasChangedTriggers { get; set; } = StateEventKind.Updated;
@@ -20,31 +31,32 @@ namespace Stl.Fusion.Blazor
         public bool IsUpdating => UntypedState == null! || UntypedState.Snapshot.IsUpdating;
         public bool IsUpdatePending => UntypedState == null! || UntypedState.Snapshot.Computed.IsInvalidated();
 
+        private static long GlobalRenderCount = 0;
+
         protected StatefulComponentBase()
         {
-			// The async modifier in the lambda passed to InvokeAsync below
-			//  is needed to prevent occasional ObjectDisposedExceptions:
-			// "Cannot process pending renders after the renderer has been disposed".
-			// Without the lambda being really async, StateHasChanged may synchronously execute an actual render immediately.
-			// Appears related to this issue https://github.com/dotnet/aspnetcore/issues/22159 
-			// To reproduce:
-			// - Uncomment the block and comment out the current block with the asynch lambda
-			// - navigate from https://localhost:5001/todo to https://localhost:5001/todo2 
-			//   where todo2 is a literal copy of the todopage.razor, with the route changed to /todo2
-			
-			//StateChanged = (state, eventKind) => InvokeAsync(() => {
-			//	if ((eventKind & StateHasChangedTriggers) != 0) {
-			//		StateHasChanged();
-			//	}
-			//});
+            StateChanged = (state, eventKind) => {
+                if ((eventKind & StateHasChangedTriggers) != 0) {
+                    Debug.WriteLine($"Calling StateHasChanged. Kind: {eventKind}. State: {state.UnsafeValue}");
+                    this.StateHasChanges();
+                }
+            };
+        }
 
-			StateChanged = (state, eventKind) => InvokeAsync(async () => {
-				if ((eventKind & StateHasChangedTriggers) != 0) {
-                    await Task.Yield();
-					StateHasChanged();
-				}
-			});
-		}
+        Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem callback, object? arg)
+        {
+            if (RerenderOnEvents)
+                StateHasChanged();
+
+            return callback.InvokeAsync(arg);
+        }
+
+        protected override void OnAfterRender(bool firstRender)
+        {
+            Interlocked.Increment(ref GlobalRenderCount);
+            Debug.WriteLine($"Rendered {GetType().Name}. Render count: {GlobalRenderCount}");
+            base.OnAfterRender(firstRender);
+        }
 
         public virtual void Dispose()
         {
